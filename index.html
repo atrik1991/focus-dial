@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOCUS DIAL — ポモドーロタイマー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12151A;
+    --surface:#1B1F27;
+    --surface-2:#232833;
+    --surface-3:#2C323F;
+    --text:#EDEBE6;
+    --text-muted:#8A93A3;
+    --text-faint:#565F6E;
+    --work:#E8A33D;
+    --work-glow:rgba(232,163,61,0.30);
+    --work-dim:#4A3D24;
+    --break:#4FAFA0;
+    --break-glow:rgba(79,175,160,0.28);
+    --break-dim:#264541;
+    --focus-hi:#E8A33D;
+    --focus-mid:#C9A227;
+    --focus-low:#5C6472;
+    --focus-none:#8A4A42;
+    --ring-track:#262B34;
+    --type-input:#E8A33D;
+    --type-input-dim:#4A3D24;
+    --type-output:#B18AF5;
+    --type-output-dim:#332B4A;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+
+  body{
+    background:
+      radial-gradient(ellipse 900px 600px at 50% -10%, #1a1f28 0%, var(--bg) 55%);
+    color:var(--text);
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:clamp(10px, 4vw, 24px);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .app{ width:100%; max-width:420px; }
+
+  .plate{
+    background:var(--surface);
+    border:1px solid #2a2f39;
+    border-radius:24px;
+    padding:clamp(20px, 6vw, 32px) clamp(16px, 5vw, 28px) clamp(18px, 5vw, 28px);
+    box-shadow:0 30px 60px -20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03);
+    position:relative;
+    overflow:hidden;
+  }
+
+  .plate::before{
+    content:"";
+    position:absolute;
+    top:0; left:0; right:0;
+    height:1px;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  }
+
+  .brand{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:22px;
+  }
+
+  .brand-mark{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.22em;
+    color:var(--text-faint);
+    text-transform:uppercase;
+  }
+
+  .brand-actions{ display:flex; gap:4px; }
+
+  .icon-btn{
+    background:none;
+    border:none;
+    color:var(--text-faint);
+    cursor:pointer;
+    font-size:15px;
+    padding:6px 8px;
+    border-radius:8px;
+    line-height:1;
+    transition:color .15s ease, background .15s ease;
+  }
+  .icon-btn:hover{ color:var(--text-muted); background:var(--surface-2); }
+
+  .screen{ display:none; }
+  .screen.active{ display:block; animation:fade .35s ease; }
+  @keyframes fade{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  /* ---------- Category setup ---------- */
+  .setup-title{ font-size:20px; font-weight:700; margin-bottom:6px; }
+  .setup-sub{ font-size:13px; color:var(--text-muted); line-height:1.7; margin-bottom:22px; }
+
+  .type-section{ margin-bottom:22px; }
+  .type-section-label{
+    font-size:12.5px; font-weight:700; margin-bottom:10px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .type-section-label.input{ color:var(--type-input); }
+  .type-section-label.output{ color:var(--type-output); }
+
+  .cat-input-row{ display:flex; gap:8px; margin-bottom:14px; }
+  .cat-input{
+    flex:1;
+    background:var(--surface-2);
+    border:1px solid #333a46;
+    color:var(--text);
+    border-radius:12px;
+    padding:12px 14px;
+    font-size:14px;
+    font-family:inherit;
+    outline:none;
+    transition:border-color .15s ease;
+  }
+  .cat-input:focus{ border-color:var(--work); }
+  .cat-input::placeholder{ color:var(--text-faint); }
+
+  .add-btn{
+    background:var(--work);
+    color:#1a1305;
+    border:none;
+    border-radius:12px;
+    width:46px;
+    font-size:20px;
+    font-weight:700;
+    cursor:pointer;
+    transition:filter .15s ease;
+  }
+  .add-btn:hover{ filter:brightness(1.08); }
+  .add-btn:disabled{ opacity:0.35; cursor:not-allowed; }
+
+  .cat-list{ list-style:none; display:flex; flex-direction:column; gap:8px; min-height:12px; }
+  .cat-list li{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--surface-2); border-radius:10px; padding:10px 12px 10px 14px; font-size:14px;
+  }
+  .cat-list li .dot{ display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--work); margin-right:10px; }
+  .cat-list li .name{ display:flex; align-items:center; flex:1; }
+  .del-btn{ background:none; border:none; color:var(--text-faint); cursor:pointer; font-size:16px; padding:2px 6px; transition:color .15s ease; }
+  .del-btn:hover{ color:var(--focus-none); }
+
+  .empty-note{
+    font-size:12.5px; color:var(--text-faint); text-align:center;
+    padding:14px 0; border:1px dashed #333a46; border-radius:10px;
+  }
+
+  .primary-btn{
+    width:100%; background:var(--work); color:#1a1305; border:none;
+    border-radius:12px; padding:14px; font-size:15px; font-weight:700;
+    font-family:inherit; cursor:pointer; transition:filter .15s ease, transform .1s ease;
+  }
+  .primary-btn:hover{ filter:brightness(1.06); }
+  .primary-btn:active{ transform:scale(0.98); }
+  .primary-btn:disabled{ opacity:0.3; cursor:not-allowed; filter:none; }
+
+  .ghost-btn{
+    width:100%; background:transparent; color:var(--text-muted); border:1px solid #333a46;
+    border-radius:12px; padding:12px; font-size:13.5px; font-family:inherit; cursor:pointer;
+    margin-top:10px; transition:border-color .15s ease, color .15s ease;
+  }
+  .ghost-btn:hover{ border-color:#4a5262; color:var(--text); }
+
+  /* ---------- Select screen ---------- */
+  .select-title{ font-size:13px; color:var(--text-muted); margin-bottom:16px; letter-spacing:0.02em; }
+
+  .chip-grid{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+  .chip{
+    background:var(--surface-2); border:1px solid #333a46; color:var(--text-muted);
+    border-radius:999px; padding:9px 16px; font-size:13.5px; font-family:inherit;
+    cursor:pointer; transition:all .15s ease;
+  }
+  .chip:hover{ border-color:#4a5262; color:var(--text); }
+  .chip.selected.type-input{ background:var(--type-input-dim); border-color:var(--type-input); color:var(--type-input); font-weight:700; }
+  .chip.selected.type-output{ background:var(--type-output-dim); border-color:var(--type-output); color:var(--type-output); font-weight:700; }
+
+  .chip-empty{ font-size:12px; color:var(--text-faint); margin:-6px 0 18px; }
+
+  .link-row{ display:flex; justify-content:center; gap:16px; margin:2px 0 20px; }
+  .manage-link{
+    text-align:center; font-size:12px; color:var(--text-faint); background:none; border:none;
+    font-family:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:3px;
+  }
+  .manage-link:hover{ color:var(--text-muted); }
+
+  .today-log{ margin-top:22px; padding-top:18px; border-top:1px solid #262b34; }
+  .today-log-title{
+    font-family:'Space Mono', monospace; font-size:10.5px; letter-spacing:0.16em;
+    color:var(--text-faint); text-transform:uppercase; margin-bottom:10px;
+  }
+  .log-row{ display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--text-muted); padding:5px 0; }
+  .log-row .fdot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .log-row .fcat{ flex:1; color:var(--text); }
+  .log-empty{ font-size:12.5px; color:var(--text-faint); }
+
+  /* ---------- Timer screen ---------- */
+  .timer-wrap{ text-align:center; }
+
+  .mode-eyebrow{ font-family:'Space Mono', monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; margin-bottom:4px; }
+  .mode-eyebrow.work{ color:var(--work); }
+  .mode-eyebrow.break{ color:var(--break); }
+
+  .cat-plate{ font-size:14px; color:var(--text-muted); margin-bottom:14px; min-height:20px; }
+
+  .phrase-block{ margin-bottom:16px; min-height:38px; }
+  .phrase{
+    font-size:13.5px; font-weight:600; line-height:1.5;
+    letter-spacing:0.01em; transition:color .3s ease;
+  }
+  .phrase.work{ color:var(--work); }
+  .phrase.break{ color:var(--break); }
+  .phrase-author{ font-size:10.5px; color:var(--text-faint); margin-top:4px; }
+
+  .ring-box{ position:relative; width:clamp(200px, 62vw, 260px); height:clamp(200px, 62vw, 260px); margin:0 auto 26px; }
+  .ring-box svg{ width:100%; height:100%; transform:rotate(-90deg); }
+  .ring-track{ fill:none; stroke:var(--ring-track); stroke-width:28; }
+  .ring-progress{ fill:none; stroke-width:28; stroke-linecap:butt; transition:stroke-dashoffset 1s linear; }
+  .ring-progress.work{ stroke:var(--work); filter:drop-shadow(0 0 10px var(--work-glow)); }
+  .ring-progress.break{ stroke:var(--break); filter:drop-shadow(0 0 10px var(--break-glow)); }
+  .tick-notch{ stroke:var(--surface); stroke-width:4; }
+
+  .ring-center{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .digits{ font-family:'Space Mono', monospace; font-size:clamp(38px, 11vw, 52px); font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:0.01em; }
+  .digits-sub{ font-family:'Space Mono', monospace; font-size:10px; letter-spacing:0.18em; color:var(--text-faint); margin-top:6px; text-transform:uppercase; }
+
+  .timer-controls{ display:flex; gap:10px; }
+  .ctrl-btn{
+    flex:1; background:var(--surface-2); border:1px solid #333a46; color:var(--text);
+    border-radius:12px; padding:13px; font-size:13.5px; font-weight:500; font-family:inherit;
+    cursor:pointer; transition:border-color .15s ease;
+  }
+  .ctrl-btn:hover{ border-color:#4a5262; }
+  .ctrl-btn.main{ background:var(--work); border-color:var(--work); color:#1a1305; font-weight:700; }
+  .timer-wrap.break-mode .ctrl-btn.main{ background:var(--break); border-color:var(--break); color:#0c1f1b; }
+
+  /* ---------- Rating screen ---------- */
+  .rate-title{ font-size:19px; font-weight:700; text-align:center; margin-bottom:6px; }
+  .rate-sub{ font-size:12.5px; color:var(--text-muted); text-align:center; margin-bottom:24px; }
+  .rate-list{ display:flex; flex-direction:column; gap:10px; }
+  .rate-btn{
+    display:flex; align-items:center; gap:12px; background:var(--surface-2); border:1px solid #333a46;
+    border-left:4px solid var(--focus-hi); color:var(--text); border-radius:12px; padding:15px 16px;
+    font-size:14.5px; font-weight:500; font-family:inherit; text-align:left; cursor:pointer;
+    transition:transform .1s ease, border-color .15s ease;
+  }
+  .rate-btn:hover{ transform:translateX(2px); }
+  .rate-btn .rdot{ width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+  .footer-note{ text-align:center; font-size:11px; color:var(--text-faint); margin-top:18px; line-height:1.6; }
+
+  /* ---------- Summary screen ---------- */
+  .summary-header{ display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+  .back-btn{
+    background:var(--surface-2); border:1px solid #333a46; color:var(--text-muted);
+    border-radius:10px; width:34px; height:34px; font-size:15px; cursor:pointer; flex-shrink:0;
+    transition:border-color .15s ease, color .15s ease;
+  }
+  .back-btn:hover{ border-color:#4a5262; color:var(--text); }
+
+  .date-nav{
+    flex:1; display:flex; align-items:center; justify-content:space-between;
+    background:var(--surface-2); border:1px solid #333a46; border-radius:10px; padding:6px 8px;
+  }
+  .date-nav-btn{
+    background:none; border:none; color:var(--text-muted); font-size:15px; cursor:pointer;
+    padding:4px 8px; border-radius:6px; transition:color .15s ease, background .15s ease;
+  }
+  .date-nav-btn:hover:not(:disabled){ color:var(--text); background:var(--surface-3); }
+  .date-nav-btn:disabled{ opacity:0.25; cursor:not-allowed; }
+  .date-label{ font-size:13.5px; font-weight:700; color:var(--text); }
+
+  .stat-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:20px; }
+  .stat-card{ background:var(--surface-2); border:1px solid #2a2f3a; border-radius:12px; padding:14px 8px; text-align:center; }
+  .stat-value{ font-family:'Space Mono', monospace; font-size:22px; font-weight:700; color:var(--work); }
+  .stat-label{ font-size:10.5px; color:var(--text-faint); margin-top:4px; letter-spacing:0.02em; }
+
+  .section-label{
+    font-family:'Space Mono', monospace; font-size:10.5px; letter-spacing:0.16em;
+    color:var(--text-faint); text-transform:uppercase; margin-bottom:10px; margin-top:22px;
+  }
+
+  .dist-bar{ display:flex; width:100%; height:10px; border-radius:6px; overflow:hidden; background:var(--surface-2); margin-bottom:8px; }
+  .dist-bar-seg{ height:100%; transition:width .3s ease; }
+  .dist-legend{ display:flex; flex-wrap:wrap; gap:12px; margin-bottom:4px; }
+  .dist-legend-item{ display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted); }
+  .dist-legend-item .ldot{ width:7px; height:7px; border-radius:50%; }
+
+  .cat-breakdown-row{ padding:10px 0; border-bottom:1px solid #232833; }
+  .cat-breakdown-row:last-child{ border-bottom:none; }
+  .cat-breakdown-row.simple{ display:flex; align-items:center; gap:10px; }
+  .cb-name{ flex:1; font-size:13.5px; color:var(--text); }
+  .cb-meta{ font-size:11.5px; color:var(--text-faint); font-family:'Space Mono', monospace; }
+  .cb-top{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:7px; flex-wrap:wrap; }
+  .ratio-bar{ display:flex; width:100%; height:7px; border-radius:4px; overflow:hidden; background:var(--surface-2); }
+  .ratio-seg{ height:100%; }
+
+  .timeline-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #232833; font-size:13px; }
+  .timeline-row:last-child{ border-bottom:none; }
+  .timeline-row .fdot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .timeline-row .tcat{ flex:1; color:var(--text); }
+  .timeline-row .ttime{ font-family:'Space Mono', monospace; font-size:11.5px; color:var(--text-faint); }
+
+  @media (prefers-reduced-motion: reduce){
+    .screen.active{ animation:none; }
+    .ring-progress{ transition:none; }
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+<div class="app">
+  <div class="plate">
+    <div class="brand">
+      <span class="brand-mark">FOCUS DIAL</span>
+      <div class="brand-actions">
+        <button class="icon-btn" id="summaryBtn" title="1日のまとめ">📊</button>
+        <button class="icon-btn" id="gearBtn" title="カテゴリーを編集">⚙</button>
+      </div>
+    </div>
+
+    <!-- Screen 1: カテゴリー設定 -->
+    <section class="screen" id="screen-setup">
+      <div class="setup-title" id="setupTitle">集中するテーマを登録</div>
+      <p class="setup-sub">25分間、何に集中するか。「インプット」「アウトプット」それぞれにカテゴリーを登録しておきます。あとからでも追加・削除できます。</p>
+
+      <div class="type-section">
+        <div class="type-section-label input">📖 インプット</div>
+        <div class="cat-input-row">
+          <input type="text" class="cat-input" id="catInputInput" placeholder="例）読書、リサーチ、業界インプット" maxlength="20">
+          <button class="add-btn" id="addBtnInput">＋</button>
+        </div>
+        <ul class="cat-list" id="catListInput"></ul>
+      </div>
+
+      <div class="type-section">
+        <div class="type-section-label output">✍️ アウトプット</div>
+        <div class="cat-input-row">
+          <input type="text" class="cat-input" id="catInputOutput" placeholder="例）資料作成、ブログ執筆、営業リスト作成" maxlength="20">
+          <button class="add-btn" id="addBtnOutput">＋</button>
+        </div>
+        <ul class="cat-list" id="catListOutput"></ul>
+      </div>
+
+      <button class="primary-btn" id="proceedBtn" disabled>この内容ではじめる</button>
+      <button class="ghost-btn" id="backFromSetupBtn" style="display:none;">戻る</button>
+    </section>
+
+    <!-- Screen 2: カテゴリー選択 -->
+    <section class="screen" id="screen-select">
+      <div class="select-title">今回、何に集中しますか？</div>
+
+      <div class="type-section-label input">📖 インプット</div>
+      <div class="chip-grid" id="chipGridInput"></div>
+      <div class="chip-empty" id="chipEmptyInput" style="display:none;">まだカテゴリーがありません</div>
+
+      <div class="type-section-label output">✍️ アウトプット</div>
+      <div class="chip-grid" id="chipGridOutput"></div>
+      <div class="chip-empty" id="chipEmptyOutput" style="display:none;">まだカテゴリーがありません</div>
+
+      <div class="link-row">
+        <button class="manage-link" id="manageBtn">＋ カテゴリーを追加・編集</button>
+        <button class="manage-link" id="summaryLink">📊 1日のまとめを見る</button>
+      </div>
+      <button class="primary-btn" id="startBtn" disabled>25分スタート</button>
+
+      <div class="today-log">
+        <div class="today-log-title">Today's Sessions</div>
+        <div id="todayLog"></div>
+      </div>
+    </section>
+
+    <!-- Screen 3: タイマー実行中 -->
+    <section class="screen" id="screen-timer">
+      <div class="timer-wrap" id="timerWrap">
+        <div class="mode-eyebrow work" id="modeEyebrow">WORK</div>
+        <div class="cat-plate" id="catPlate">—</div>
+        <div class="phrase-block">
+          <div class="phrase work" id="phraseText"></div>
+          <div class="phrase-author" id="phraseAuthor"></div>
+        </div>
+
+        <div class="ring-box">
+          <svg viewBox="0 0 260 260">
+            <circle class="ring-track" cx="130" cy="130" r="107"></circle>
+            <circle class="ring-progress work" id="ringProgress" cx="130" cy="130" r="107"></circle>
+            <g id="tickGroup"></g>
+          </svg>
+          <div class="ring-center">
+            <div class="digits" id="digits">25:00</div>
+            <div class="digits-sub" id="digitsSub">WORK SESSION</div>
+          </div>
+        </div>
+
+        <div class="timer-controls">
+          <button class="ctrl-btn main" id="pauseBtn">一時停止</button>
+          <button class="ctrl-btn" id="resetBtn">リセット</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screen 4: 集中度評価 -->
+    <section class="screen" id="screen-rating">
+      <div class="rate-title">おつかれさまでした</div>
+      <div class="rate-sub" id="rateSub">この25分、集中できましたか？</div>
+      <div class="rate-list">
+        <button class="rate-btn" data-rating="4" style="border-left-color:var(--focus-hi)">
+          <span class="rdot" style="background:var(--focus-hi)"></span> しっかり集中できた
+        </button>
+        <button class="rate-btn" data-rating="3" style="border-left-color:var(--focus-mid)">
+          <span class="rdot" style="background:var(--focus-mid)"></span> まあまあ集中できた
+        </button>
+        <button class="rate-btn" data-rating="2" style="border-left-color:var(--focus-low)">
+          <span class="rdot" style="background:var(--focus-low)"></span> あまり集中できなかった
+        </button>
+        <button class="rate-btn" data-rating="1" style="border-left-color:var(--focus-none)">
+          <span class="rdot" style="background:var(--focus-none)"></span> 全然集中できなかった
+        </button>
+      </div>
+      <p class="footer-note">記録すると、5分の休憩がはじまります</p>
+    </section>
+
+    <!-- Screen 5: サマリー -->
+    <section class="screen" id="screen-summary">
+      <div class="summary-header">
+        <button class="back-btn" id="summaryBackBtn">←</button>
+        <div class="date-nav">
+          <button class="date-nav-btn" id="prevDayBtn">‹</button>
+          <span class="date-label" id="dateLabel">—</span>
+          <button class="date-nav-btn" id="nextDayBtn">›</button>
+        </div>
+      </div>
+
+      <div id="summaryEmpty" class="empty-note" style="display:none;">この日の記録はまだありません</div>
+
+      <div id="summaryContent">
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="statSessions">0</div>
+            <div class="stat-label">セッション数</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statMinutes">0</div>
+            <div class="stat-label">集中分数</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statAvg">—</div>
+            <div class="stat-label">平均集中度</div>
+          </div>
+        </div>
+
+        <div class="section-label">集中度の内訳</div>
+        <div class="dist-bar" id="distBar"></div>
+        <div class="dist-legend">
+          <div class="dist-legend-item"><span class="ldot" style="background:var(--focus-hi)"></span>しっかり</div>
+          <div class="dist-legend-item"><span class="ldot" style="background:var(--focus-mid)"></span>まあまあ</div>
+          <div class="dist-legend-item"><span class="ldot" style="background:var(--focus-low)"></span>あまり</div>
+          <div class="dist-legend-item"><span class="ldot" style="background:var(--focus-none)"></span>全然</div>
+        </div>
+
+        <div class="section-label">インプット / アウトプットの内訳</div>
+        <div class="dist-bar" id="typeDistBar"></div>
+        <div class="dist-legend" id="typeDistLegend"></div>
+
+        <div class="section-label">カテゴリー別</div>
+        <div id="catBreakdown"></div>
+
+        <div class="section-label">タイムライン</div>
+        <div id="timeline"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const LS_CATS = 'focusdial_categories';
+  const LS_LOGS = 'focusdial_logs';
+  const LS_DEVICE = 'focusdial_device_id';
+
+  let categories = JSON.parse(localStorage.getItem(LS_CATS) || '[]');
+  // 旧バージョン（文字列配列）からの移行: すべて "input" タイプとして扱う
+  categories = categories.map(c => (typeof c === 'string') ? { name: c, type: 'input' } : c);
+
+  let logs = JSON.parse(localStorage.getItem(LS_LOGS) || '[]');
+  logs = logs.map(l => l.type ? l : Object.assign({}, l, { type: 'input' }));
+
+  // ---------- Supabase 連携 ----------
+  const SUPABASE_URL = 'https://eabpkpfshikhhpowljan.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_928E1pGwMAlNaom_xWGQPA_WO5yBpeU';
+  let sb = null;
+  try{
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  } catch(e){ sb = null; }
+
+  let deviceId = localStorage.getItem(LS_DEVICE);
+  if(!deviceId){
+    deviceId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('dev-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    localStorage.setItem(LS_DEVICE, deviceId);
+  }
+
+  let selectedCategory = null;
+  let selectedType = null; // 'input' | 'output'
+
+  const WORK_SECONDS = 25 * 60;
+
+  const WORK_PHRASES = [
+    { text: '継続は力なり', author: '住岡夜晃' },
+    { text: 'はじめることが、前進する秘訣だ', author: 'マーク・トウェイン' },
+    { text: '止まらない限り、どれだけゆっくりでもかまわない', author: '孔子' },
+    { text: '天才とは一パーセントのひらめきと九十九パーセントの努力である', author: 'トーマス・エジソン' },
+    { text: '未来を予測する最善の方法は、それを創り出すことだ', author: 'ピーター・ドラッカー' },
+    { text: '成功は九十九パーセントの失敗に支えられた一パーセントである', author: '本田宗一郎' },
+    { text: 'ハングリーであれ、愚か者であれ', author: 'スティーブ・ジョブズ' },
+    { text: '今日ただ今、この一瞬に全力を尽くせ', author: '松下幸之助' },
+    { text: '千里の道も一歩から', author: '老子' },
+    { text: '我々は繰り返す行動によってつくられる。優れているとは習慣である', author: 'アリストテレス' },
+  ];
+  const BREAK_PHRASES = [
+    { text: '休息を取れ。休ませた畑は、豊かな実りをもたらす', author: 'オウィディウス' },
+    { text: '自然は急がない。それでもすべてを成し遂げる', author: '老子' },
+    { text: 'その日を終えたら、それでいい', author: 'ラルフ・ワルド・エマーソン' },
+    { text: '安らぎは内にある。外に求めるな', author: 'ブッダ' },
+    { text: '時には少し離れて休むといい。判断力はより確かになる', author: 'レオナルド・ダ・ヴィンチ' },
+    { text: '息を吸って心を落ち着け、息を吐いて微笑む', author: 'ティク・ナット・ハン' },
+    { text: '人生には、スピードを上げること以上に大切なものがある', author: 'マハトマ・ガンジー' },
+    { text: '急がば回れ', author: 'ことわざ' },
+    { text: '一休みも仕事のうち', author: 'ことわざ' },
+    { text: '心が乱れたときほど、まず深呼吸をしなさい', author: 'ダライ・ラマ14世' },
+  ];
+  function randomPhrase(mode){
+    const list = mode === 'work' ? WORK_PHRASES : BREAK_PHRASES;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+  const BREAK_SECONDS = 5 * 60;
+  const R = 107;
+  const CIRC = 2 * Math.PI * R;
+
+  let timerState = null;
+
+  function saveCats(){ localStorage.setItem(LS_CATS, JSON.stringify(categories)); }
+  function saveLogs(){ localStorage.setItem(LS_LOGS, JSON.stringify(logs)); }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function typeIcon(type){ return type === 'input' ? '📖' : '✍️'; }
+  function typeLabel(type){ return type === 'input' ? 'インプット' : 'アウトプット'; }
+
+  function dayKeyFromTs(ts){
+    const d = new Date(ts);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function timeStrFromTs(ts){
+    const d = new Date(ts);
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+  const WEEKDAYS = ['日','月','火','水','木','金','土'];
+  function dayLabelFromKey(key){
+    const parts = key.split('-').map(Number);
+    const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
+    return parts[1] + '月' + parts[2] + '日（' + WEEKDAYS[dateObj.getDay()] + '）';
+  }
+  function todayKey(){ return dayKeyFromTs(Date.now()); }
+
+  const screens = {
+    setup: document.getElementById('screen-setup'),
+    select: document.getElementById('screen-select'),
+    timer: document.getElementById('screen-timer'),
+    rating: document.getElementById('screen-rating'),
+    summary: document.getElementById('screen-summary'),
+  };
+  function showScreen(name){
+    Object.values(screens).forEach(s => s.classList.remove('active'));
+    screens[name].classList.add('active');
+  }
+
+  // ---------- Setup screen ----------
+  const catInputEl = { input: document.getElementById('catInputInput'), output: document.getElementById('catInputOutput') };
+  const addBtnEl = { input: document.getElementById('addBtnInput'), output: document.getElementById('addBtnOutput') };
+  const catListEl = { input: document.getElementById('catListInput'), output: document.getElementById('catListOutput') };
+  const proceedBtn = document.getElementById('proceedBtn');
+  const backFromSetupBtn = document.getElementById('backFromSetupBtn');
+  const setupTitle = document.getElementById('setupTitle');
+
+  function renderCatListForType(type){
+    const listEl = catListEl[type];
+    const subset = categories.filter(c => c.type === type);
+    listEl.innerHTML = '';
+    if(subset.length === 0){
+      const li = document.createElement('li');
+      li.className = 'empty-note';
+      li.style.cssText = 'display:block; background:none;';
+      li.textContent = 'まだ' + typeLabel(type) + 'のカテゴリーがありません';
+      listEl.appendChild(li);
+    } else {
+      subset.forEach(c => {
+        const li = document.createElement('li');
+        li.innerHTML = '<span class="name"><span class="dot"></span>' + escapeHtml(c.name) + '</span>';
+        const del = document.createElement('button');
+        del.className = 'del-btn';
+        del.textContent = '✕';
+        del.addEventListener('click', () => {
+          const idx = categories.findIndex(x => x.type === type && x.name === c.name);
+          if(idx > -1) categories.splice(idx, 1);
+          saveCats();
+          renderCatListForType(type);
+          updateProceedState();
+          if(sb){
+            sb.from('pomodoro_categories').delete().eq('device_id', deviceId).eq('type', type).eq('name', c.name)
+              .then(({error}) => { if(error) console.warn('category delete sync failed:', String(error.message || error)); })
+              .catch((err) => { console.warn('category delete sync unreachable:', String(err && err.message || err)); });
+          }
+        });
+        li.appendChild(del);
+        listEl.appendChild(li);
+      });
+    }
+  }
+
+  function renderCatList(){
+    renderCatListForType('input');
+    renderCatListForType('output');
+    updateProceedState();
+  }
+
+  function updateProceedState(){
+    proceedBtn.disabled = categories.length === 0;
+  }
+
+  function addCategory(type){
+    const inputEl = catInputEl[type];
+    const val = inputEl.value.trim();
+    if(!val) return;
+    if(categories.some(c => c.type === type && c.name === val)){ inputEl.value = ''; return; }
+    categories.push({ name: val, type });
+    saveCats();
+    inputEl.value = '';
+    renderCatListForType(type);
+    updateProceedState();
+    inputEl.focus();
+    if(sb){
+      sb.from('pomodoro_categories').insert({ device_id: deviceId, type, name: val })
+        .then(({error}) => { if(error) console.warn('category sync failed:', String(error.message || error)); })
+        .catch((err) => { console.warn('category sync unreachable:', String(err && err.message || err)); });
+    }
+  }
+
+  ['input','output'].forEach(type => {
+    addBtnEl[type].addEventListener('click', () => addCategory(type));
+
+    // IME変換中(isComposing)のEnterでは追加を発火させない
+    let composing = false;
+    catInputEl[type].addEventListener('compositionstart', () => { composing = true; });
+    catInputEl[type].addEventListener('compositionend', () => { composing = false; });
+    catInputEl[type].addEventListener('keydown', (e) => {
+      if(e.key !== 'Enter') return;
+      if(composing || e.isComposing || e.keyCode === 229) return; // 変換確定のEnterは無視
+      e.preventDefault();
+      addCategory(type);
+    });
+  });
+
+  proceedBtn.addEventListener('click', () => {
+    if(categories.length === 0) return;
+    goToSelect();
+  });
+  backFromSetupBtn.addEventListener('click', () => { goToSelect(); });
+
+  function openSetup(fromManage){
+    setupTitle.textContent = fromManage ? 'カテゴリーを編集' : '集中するテーマを登録';
+    proceedBtn.textContent = fromManage ? '完了' : 'この内容ではじめる';
+    backFromSetupBtn.style.display = fromManage ? 'block' : 'none';
+    renderCatList();
+    showScreen('setup');
+    catInputEl.input.focus();
+  }
+
+  document.getElementById('manageBtn').addEventListener('click', () => openSetup(true));
+  document.getElementById('gearBtn').addEventListener('click', () => openSetup(true));
+
+  // ---------- Select screen ----------
+  const chipGridEl = { input: document.getElementById('chipGridInput'), output: document.getElementById('chipGridOutput') };
+  const chipEmptyEl = { input: document.getElementById('chipEmptyInput'), output: document.getElementById('chipEmptyOutput') };
+  const startBtn = document.getElementById('startBtn');
+  const todayLog = document.getElementById('todayLog');
+
+  function renderChips(){
+    ['input','output'].forEach(type => {
+      const gridEl = chipGridEl[type];
+      const subset = categories.filter(c => c.type === type);
+      gridEl.innerHTML = '';
+      chipEmptyEl[type].style.display = subset.length === 0 ? 'block' : 'none';
+      subset.forEach(c => {
+        const chip = document.createElement('button');
+        const isSelected = selectedType === type && selectedCategory === c.name;
+        chip.className = 'chip' + (isSelected ? ' selected type-' + type : '');
+        chip.textContent = c.name;
+        chip.addEventListener('click', () => {
+          selectedCategory = c.name;
+          selectedType = type;
+          renderChips();
+          startBtn.disabled = false;
+        });
+        gridEl.appendChild(chip);
+      });
+    });
+  }
+
+  const focusColors = { 4:'var(--focus-hi)', 3:'var(--focus-mid)', 2:'var(--focus-low)', 1:'var(--focus-none)' };
+  const focusLabels = { 4:'しっかり', 3:'まあまあ', 2:'あまり', 1:'全然' };
+
+  function renderTodayLog(){
+    const today = todayKey();
+    const todays = logs.filter(l => dayKeyFromTs(l.ts) === today);
+    if(todays.length === 0){
+      todayLog.innerHTML = '<div class="log-empty">まだ記録はありません</div>';
+      return;
+    }
+    todayLog.innerHTML = todays.slice().sort((a,b)=>b.ts-a.ts).map(l =>
+      '<div class="log-row">' +
+        '<span class="fdot" style="background:' + focusColors[l.rating] + '"></span>' +
+        '<span class="fcat">' + typeIcon(l.type) + ' ' + escapeHtml(l.category) + '</span>' +
+        '<span>' + timeStrFromTs(l.ts) + '</span>' +
+      '</div>'
+    ).join('');
+  }
+
+  function goToSelect(){
+    if(selectedCategory && !categories.some(c => c.type === selectedType && c.name === selectedCategory)){
+      selectedCategory = null; selectedType = null;
+    }
+    renderChips();
+    renderTodayLog();
+    startBtn.disabled = !(selectedCategory && selectedType);
+    showScreen('select');
+  }
+
+  startBtn.addEventListener('click', () => {
+    if(!selectedCategory || !selectedType) return;
+    startTimer('work');
+  });
+
+  // ---------- Timer screen ----------
+  const modeEyebrow = document.getElementById('modeEyebrow');
+  const catPlate = document.getElementById('catPlate');
+  const phraseText = document.getElementById('phraseText');
+  const phraseAuthor = document.getElementById('phraseAuthor');
+  const ringProgress = document.getElementById('ringProgress');
+  const tickGroup = document.getElementById('tickGroup');
+  const digits = document.getElementById('digits');
+  const digitsSub = document.getElementById('digitsSub');
+  const timerWrap = document.getElementById('timerWrap');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const resetBtn = document.getElementById('resetBtn');
+
+  ringProgress.style.strokeDasharray = String(CIRC);
+  ringProgress.style.strokeDashoffset = '0';
+
+  function buildTicks(intervalMinutes, totalSeconds){
+    tickGroup.innerHTML = '';
+    const totalMinutes = totalSeconds / 60;
+    const count = totalMinutes / intervalMinutes;
+    for(let i=0; i<count; i++){
+      const angle = (i / count) * 2 * Math.PI - Math.PI/2;
+      const x1 = 130 + Math.cos(angle) * 90;
+      const y1 = 130 + Math.sin(angle) * 90;
+      const x2 = 130 + Math.cos(angle) * 124;
+      const y2 = 130 + Math.sin(angle) * 124;
+      const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+      line.setAttribute('class','tick-notch');
+      line.setAttribute('transform','rotate(90 130 130)');
+      tickGroup.appendChild(line);
+    }
+  }
+
+  // ---------- 画面スリープ防止 (Wake Lock) ----------
+  let wakeLock = null;
+  async function requestWakeLock(){
+    if(!('wakeLock' in navigator)) return;
+    try{
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch(e){ /* 権限がない・非対応などは静かに無視 */ }
+  }
+  function releaseWakeLock(){
+    if(wakeLock){
+      wakeLock.release().catch(() => {});
+      wakeLock = null;
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && timerState && !timerState.paused){
+      requestWakeLock();
+    }
+  });
+
+  function formatTime(sec){
+    const m = Math.floor(sec/60).toString().padStart(2,'0');
+    const s = Math.floor(sec%60).toString().padStart(2,'0');
+    return m+':'+s;
+  }
+
+  function startTimer(mode){
+    const total = mode === 'work' ? WORK_SECONDS : BREAK_SECONDS;
+    timerState = {
+      mode, totalSeconds: total, remainingSeconds: total,
+      endTs: Date.now() + total*1000, intervalId: null, paused: false, warnedThirty: false
+    };
+    requestWakeLock();
+
+    modeEyebrow.textContent = mode === 'work' ? 'WORK' : 'BREAK';
+    modeEyebrow.className = 'mode-eyebrow ' + mode;
+    ringProgress.setAttribute('class', 'ring-progress ' + mode);
+    ringProgress.style.strokeDashoffset = '0';
+    timerWrap.className = 'timer-wrap' + (mode === 'break' ? ' break-mode' : '');
+    catPlate.textContent = mode === 'work' ? (typeIcon(selectedType) + ' ' + selectedCategory) : '休憩タイム';
+    const phrase = randomPhrase(mode);
+    phraseText.textContent = phrase.text;
+    phraseAuthor.textContent = '— ' + phrase.author;
+    phraseText.className = 'phrase ' + mode;
+    digitsSub.textContent = mode === 'work' ? 'WORK SESSION' : 'BREAK TIME';
+    digits.textContent = formatTime(total);
+    pauseBtn.textContent = '一時停止';
+    tickGroup.innerHTML = ''; // リングに切れ目を作らないため目盛りは描画しない
+
+    showScreen('timer');
+
+    requestAnimationFrame(() => { requestAnimationFrame(tick); });
+    if(timerState.intervalId) clearInterval(timerState.intervalId);
+    timerState.intervalId = setInterval(tick, 1000);
+  }
+
+  function tick(){
+    if(!timerState || timerState.paused) return;
+    const remaining = Math.max(0, Math.round((timerState.endTs - Date.now())/1000));
+    timerState.remainingSeconds = remaining;
+    digits.textContent = formatTime(remaining);
+    const frac = remaining / timerState.totalSeconds;
+    ringProgress.style.strokeDashoffset = String(-(CIRC * (1 - frac)));
+
+    if(timerState.mode === 'break' && remaining === 30 && !timerState.warnedThirty){
+      timerState.warnedThirty = true;
+      playChime('warn');
+    }
+
+    if(remaining <= 0){
+      clearInterval(timerState.intervalId);
+      releaseWakeLock();
+      playChime();
+      if(timerState.mode === 'work'){
+        showRating();
+      } else {
+        goToSelect();
+      }
+    }
+  }
+
+  pauseBtn.addEventListener('click', () => {
+    if(!timerState) return;
+    if(timerState.paused){
+      timerState.paused = false;
+      timerState.endTs = Date.now() + timerState.remainingSeconds*1000;
+      pauseBtn.textContent = '一時停止';
+      requestWakeLock();
+    } else {
+      timerState.paused = true;
+      pauseBtn.textContent = '再開';
+      releaseWakeLock();
+    }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    if(!timerState) return;
+    clearInterval(timerState.intervalId);
+    releaseWakeLock();
+    goToSelect();
+  });
+
+  function showRating(){
+    showScreen('rating');
+  }
+
+  document.querySelectorAll('.rate-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const rating = parseInt(btn.dataset.rating, 10);
+      logs.push({ category: selectedCategory, type: selectedType, rating, ts: Date.now() });
+      saveLogs();
+      startTimer('break');
+      if(sb){
+        sb.from('pomodoro_sessions').insert({ device_id: deviceId, category: selectedCategory, type: selectedType, rating })
+          .then(({error}) => { if(error) console.warn('session sync failed:', String(error.message || error)); })
+          .catch((err) => { console.warn('session sync unreachable:', String(err && err.message || err)); });
+      }
+    });
+  });
+
+  // ---------- Summary screen ----------
+  const summaryEmpty = document.getElementById('summaryEmpty');
+  const summaryContent = document.getElementById('summaryContent');
+  const dateLabel = document.getElementById('dateLabel');
+  const prevDayBtn = document.getElementById('prevDayBtn');
+  const nextDayBtn = document.getElementById('nextDayBtn');
+  const statSessions = document.getElementById('statSessions');
+  const statMinutes = document.getElementById('statMinutes');
+  const statAvg = document.getElementById('statAvg');
+  const distBar = document.getElementById('distBar');
+  const typeDistBar = document.getElementById('typeDistBar');
+  const typeDistLegend = document.getElementById('typeDistLegend');
+  const catBreakdown = document.getElementById('catBreakdown');
+  const timeline = document.getElementById('timeline');
+
+  let summaryDayKeys = [];
+  let summaryIndex = -1;
+
+  function getAllDayKeys(){
+    const set = new Set(logs.map(l => dayKeyFromTs(l.ts)));
+    set.add(todayKey());
+    return Array.from(set).sort();
+  }
+
+  function openSummary(){
+    summaryDayKeys = getAllDayKeys();
+    summaryIndex = summaryDayKeys.indexOf(todayKey());
+    if(summaryIndex === -1) summaryIndex = summaryDayKeys.length - 1;
+    renderSummary();
+    showScreen('summary');
+  }
+
+  function renderSummary(){
+    const key = summaryDayKeys[summaryIndex];
+    dateLabel.textContent = dayLabelFromKey(key) + (key === todayKey() ? '（今日）' : '');
+    prevDayBtn.disabled = summaryIndex <= 0;
+    nextDayBtn.disabled = summaryIndex >= summaryDayKeys.length - 1;
+
+    const dayLogs = logs.filter(l => dayKeyFromTs(l.ts) === key).sort((a,b)=>a.ts-b.ts);
+
+    if(dayLogs.length === 0){
+      summaryEmpty.style.display = 'block';
+      summaryContent.style.display = 'none';
+      return;
+    }
+    summaryEmpty.style.display = 'none';
+    summaryContent.style.display = 'block';
+
+    statSessions.textContent = dayLogs.length;
+    statMinutes.textContent = dayLogs.length * 25;
+    const avg = dayLogs.reduce((s,l)=>s+l.rating,0) / dayLogs.length;
+    statAvg.textContent = avg.toFixed(1);
+
+    // 集中度の内訳
+    const counts = {4:0,3:0,2:0,1:0};
+    dayLogs.forEach(l => counts[l.rating]++);
+    distBar.innerHTML = [4,3,2,1].map(r => {
+      const pct = (counts[r] / dayLogs.length) * 100;
+      if(pct === 0) return '';
+      return '<div class="dist-bar-seg" style="width:' + pct + '%; background:' + focusColors[r] + '"></div>';
+    }).join('');
+
+    // インプット/アウトプットの内訳
+    const typeCounts = { input:0, output:0 };
+    dayLogs.forEach(l => { typeCounts[l.type] = (typeCounts[l.type]||0) + 1; });
+    typeDistBar.innerHTML = ['input','output'].map(t => {
+      const pct = (typeCounts[t] / dayLogs.length) * 100;
+      if(pct === 0) return '';
+      const color = t === 'input' ? 'var(--type-input)' : 'var(--type-output)';
+      return '<div class="dist-bar-seg" style="width:' + pct + '%; background:' + color + '"></div>';
+    }).join('');
+    typeDistLegend.innerHTML =
+      '<div class="dist-legend-item"><span class="ldot" style="background:var(--type-input)"></span>📖 インプット ' + typeCounts.input + '回・' + (typeCounts.input*25) + '分</div>' +
+      '<div class="dist-legend-item"><span class="ldot" style="background:var(--type-output)"></span>✍️ アウトプット ' + typeCounts.output + '回・' + (typeCounts.output*25) + '分</div>';
+
+    // カテゴリー別（同名カテゴリーがinput/output両方にある場合は比率バーを表示）
+    const byName = {};
+    dayLogs.forEach(l => {
+      if(!byName[l.category]) byName[l.category] = { input:{count:0,sum:0}, output:{count:0,sum:0} };
+      byName[l.category][l.type].count++;
+      byName[l.category][l.type].sum += l.rating;
+    });
+    catBreakdown.innerHTML = Object.keys(byName).map(name => {
+      const info = byName[name];
+      const hasInput = info.input.count > 0;
+      const hasOutput = info.output.count > 0;
+      if(hasInput && hasOutput){
+        const total = info.input.count + info.output.count;
+        const inputPct = (info.input.count / total) * 100;
+        const outputPct = 100 - inputPct;
+        return '<div class="cat-breakdown-row">' +
+          '<div class="cb-top">' +
+            '<span class="cb-name">' + escapeHtml(name) + '</span>' +
+            '<span class="cb-meta">📖' + info.input.count + '回・' + (info.input.count*25) + '分 ／ ✍️' + info.output.count + '回・' + (info.output.count*25) + '分</span>' +
+          '</div>' +
+          '<div class="ratio-bar">' +
+            '<div class="ratio-seg" style="width:' + inputPct + '%; background:var(--type-input)"></div>' +
+            '<div class="ratio-seg" style="width:' + outputPct + '%; background:var(--type-output)"></div>' +
+          '</div>' +
+        '</div>';
+      }
+      const t = hasInput ? 'input' : 'output';
+      const d = info[t];
+      const avgCat = (d.sum / d.count).toFixed(1);
+      const color = t === 'input' ? 'var(--type-input)' : 'var(--type-output)';
+      return '<div class="cat-breakdown-row simple">' +
+        '<span class="cb-name" style="color:' + color + '">' + typeIcon(t) + ' ' + escapeHtml(name) + '</span>' +
+        '<span class="cb-meta">' + d.count + '回 ・ ' + (d.count*25) + '分 ・ 平均' + avgCat + '</span>' +
+      '</div>';
+    }).join('');
+
+    // タイムライン
+    timeline.innerHTML = dayLogs.slice().reverse().map(l =>
+      '<div class="timeline-row">' +
+        '<span class="fdot" style="background:' + focusColors[l.rating] + '"></span>' +
+        '<span class="tcat">' + typeIcon(l.type) + ' ' + escapeHtml(l.category) + '</span>' +
+        '<span class="cb-meta">' + focusLabels[l.rating] + '</span>' +
+        '<span class="ttime">' + timeStrFromTs(l.ts) + '</span>' +
+      '</div>'
+    ).join('');
+  }
+
+  prevDayBtn.addEventListener('click', () => {
+    if(summaryIndex > 0){ summaryIndex--; renderSummary(); }
+  });
+  nextDayBtn.addEventListener('click', () => {
+    if(summaryIndex < summaryDayKeys.length - 1){ summaryIndex++; renderSummary(); }
+  });
+  document.getElementById('summaryBackBtn').addEventListener('click', () => goToSelect());
+  document.getElementById('summaryBtn').addEventListener('click', () => openSummary());
+  document.getElementById('summaryLink').addEventListener('click', () => openSummary());
+
+  // ---------- Sound ----------
+  function playChime(kind){
+    try{
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      const freqs = kind === 'warn' ? [740] : [880, 1108];
+      const peak = kind === 'warn' ? 0.12 : 0.18;
+      freqs.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, now + i*0.18);
+        gain.gain.linearRampToValueAtTime(peak, now + i*0.18 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + i*0.18 + 0.5);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + i*0.18);
+        osc.stop(now + i*0.18 + 0.55);
+      });
+    } catch(e){ /* audio not available, ignore silently */ }
+  }
+
+  // ---------- Init ----------
+  async function initApp(){
+    if(sb){
+      try{
+        const [catRes, sessRes] = await Promise.all([
+          sb.from('pomodoro_categories').select('name, type, created_at').eq('device_id', deviceId).order('created_at', { ascending: true }),
+          sb.from('pomodoro_sessions').select('category, type, rating, created_at').eq('device_id', deviceId).order('created_at', { ascending: true }),
+        ]);
+        if(!catRes.error && catRes.data){
+          categories = catRes.data.map(r => ({ name: r.name, type: r.type || 'input' }));
+          saveCats();
+        }
+        if(!sessRes.error && sessRes.data){
+          logs = sessRes.data.map(r => ({
+            category: r.category,
+            type: r.type || 'input',
+            rating: r.rating,
+            ts: new Date(r.created_at).getTime(),
+          }));
+          saveLogs();
+        }
+      } catch(e){
+        console.warn('Supabase同期に失敗、ローカルのデータを使用します', e);
+      }
+    }
+
+    if(categories.length === 0){
+      openSetup(false);
+    } else {
+      goToSelect();
+    }
+  }
+
+  initApp();
+})();
+</script>
+
+</body>
+</html>
