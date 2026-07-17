@@ -491,7 +491,6 @@
 
   const LS_CATS = 'focusdial_categories';
   const LS_LOGS = 'focusdial_logs';
-  const LS_DEVICE = 'focusdial_device_id';
 
   let categories = JSON.parse(localStorage.getItem(LS_CATS) || '[]');
   // 旧バージョン（文字列配列）からの移行: すべて "input" タイプとして扱う
@@ -507,12 +506,6 @@
   try{
     sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   } catch(e){ sb = null; }
-
-  let deviceId = localStorage.getItem(LS_DEVICE);
-  if(!deviceId){
-    deviceId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('dev-' + Date.now() + '-' + Math.random().toString(36).slice(2));
-    localStorage.setItem(LS_DEVICE, deviceId);
-  }
 
   let selectedCategory = null;
   let selectedType = null; // 'input' | 'output'
@@ -625,7 +618,7 @@
           renderCatListForType(type);
           updateProceedState();
           if(sb){
-            sb.from('pomodoro_categories').delete().eq('device_id', deviceId).eq('type', type).eq('name', c.name)
+            sb.from('pomodoro_categories').delete().eq('type', type).eq('name', c.name)
               .then(({error}) => { if(error) console.warn('category delete sync failed:', String(error.message || error)); })
               .catch((err) => { console.warn('category delete sync unreachable:', String(err && err.message || err)); });
           }
@@ -658,7 +651,7 @@
     updateProceedState();
     inputEl.focus();
     if(sb){
-      sb.from('pomodoro_categories').insert({ device_id: deviceId, type, name: val })
+      sb.from('pomodoro_categories').insert({ type, name: val })
         .then(({error}) => { if(error) console.warn('category sync failed:', String(error.message || error)); })
         .catch((err) => { console.warn('category sync unreachable:', String(err && err.message || err)); });
     }
@@ -908,7 +901,7 @@
       saveLogs();
       startTimer('break');
       if(sb){
-        sb.from('pomodoro_sessions').insert({ device_id: deviceId, category: selectedCategory, type: selectedType, rating })
+        sb.from('pomodoro_sessions').insert({ category: selectedCategory, type: selectedType, rating })
           .then(({error}) => { if(error) console.warn('session sync failed:', String(error.message || error)); })
           .catch((err) => { console.warn('session sync unreachable:', String(err && err.message || err)); });
       }
@@ -1074,8 +1067,8 @@
     if(sb){
       try{
         const [catRes, sessRes] = await Promise.all([
-          sb.from('pomodoro_categories').select('name, type, created_at').eq('device_id', deviceId).order('created_at', { ascending: true }),
-          sb.from('pomodoro_sessions').select('category, type, rating, created_at').eq('device_id', deviceId).order('created_at', { ascending: true }),
+          sb.from('pomodoro_categories').select('name, type, created_at').order('created_at', { ascending: true }),
+          sb.from('pomodoro_sessions').select('category, type, rating, created_at').order('created_at', { ascending: true }),
         ]);
         if(!catRes.error && catRes.data){
           categories = catRes.data.map(r => ({ name: r.name, type: r.type || 'input' }));
