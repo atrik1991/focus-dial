@@ -111,7 +111,24 @@
   .primary-btn:active{ transform:scale(0.98); }
 
   /* ---------- Home screen ---------- */
-  .home-title{ font-size:15px; color:var(--text-muted); text-align:center; margin:8px 0 22px; }
+  .home-title{ font-size:15px; color:var(--text-muted); text-align:center; margin:8px 0 20px; }
+
+  .setting-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--surface-2); border:1px solid #2a2f3a; border-radius:12px;
+    padding:12px 14px; margin-bottom:10px;
+  }
+  .setting-label{ font-size:13.5px; color:var(--text-muted); }
+  .setting-select{
+    background:var(--surface-3); border:1px solid #3a4150; color:var(--text);
+    font-family:'Space Mono', monospace; font-size:14.5px; font-weight:700;
+    padding:8px 12px; border-radius:8px; cursor:pointer; outline:none;
+    -webkit-appearance:none; appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238A93A3' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 10px center;
+    padding-right:28px;
+  }
+  .setting-select:focus{ border-color:var(--work); }
 
   .link-row{ display:flex; justify-content:center; gap:16px; margin:16px 0 4px; }
   .manage-link{
@@ -247,8 +264,18 @@
 
     <!-- Screen 1: ホーム -->
     <section class="screen" id="screen-home">
-      <div class="home-title">25分、はじめますか？</div>
-      <button class="primary-btn" id="startBtn">25分スタート</button>
+      <div class="home-title" id="homeTitle">はじめますか？</div>
+
+      <div class="setting-row">
+        <span class="setting-label">集中時間</span>
+        <select class="setting-select" id="workSelect"></select>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">休憩時間</span>
+        <select class="setting-select" id="breakSelect"></select>
+      </div>
+
+      <button class="primary-btn" id="startBtn" style="margin-top:14px;">スタート</button>
       <div class="link-row">
         <button class="manage-link" id="summaryLink">📊 1日のまとめを見る</button>
       </div>
@@ -304,7 +331,7 @@
           <span class="rdot" style="background:var(--focus-none)"></span> 全然集中できなかった
         </button>
       </div>
-      <p class="footer-note">記録すると、5分の休憩がはじまります</p>
+      <p class="footer-note" id="footerNote">記録すると、5分の休憩がはじまります</p>
     </section>
 
     <!-- Screen 4: サマリー -->
@@ -375,8 +402,15 @@
     localStorage.setItem(LS_DEVICE, deviceId);
   }
 
-  const WORK_SECONDS = 25 * 60;
-  const BREAK_SECONDS = 5 * 60;
+  const LS_WORK_MIN = 'focusdial_work_min';
+  const LS_BREAK_MIN = 'focusdial_break_min';
+  const WORK_MIN_LIMITS = { min: 5, max: 90, step: 5 };
+  const BREAK_MIN_LIMITS = { min: 5, max: 15, step: 5 };
+
+  let workMinutes = parseInt(localStorage.getItem(LS_WORK_MIN), 10) || 25;
+  let breakMinutes = parseInt(localStorage.getItem(LS_BREAK_MIN), 10) || 5;
+  workMinutes = Math.min(WORK_MIN_LIMITS.max, Math.max(WORK_MIN_LIMITS.min, workMinutes));
+  breakMinutes = Math.min(BREAK_MIN_LIMITS.max, Math.max(BREAK_MIN_LIMITS.min, breakMinutes));
 
   const WORK_PHRASES = [
     { text: '継続は力なり', author: '住岡夜晃' },
@@ -444,6 +478,36 @@
   // ---------- Home screen ----------
   const startBtn = document.getElementById('startBtn');
   const todayLog = document.getElementById('todayLog');
+  const workSelectEl = document.getElementById('workSelect');
+  const breakSelectEl = document.getElementById('breakSelect');
+
+  function buildOptions(selectEl, limits){
+    selectEl.innerHTML = '';
+    for(let v = limits.min; v <= limits.max; v += limits.step){
+      const opt = document.createElement('option');
+      opt.value = String(v);
+      opt.textContent = v + '分';
+      selectEl.appendChild(opt);
+    }
+  }
+  buildOptions(workSelectEl, WORK_MIN_LIMITS);
+  buildOptions(breakSelectEl, BREAK_MIN_LIMITS);
+
+  function renderSteppers(){
+    workSelectEl.value = String(workMinutes);
+    breakSelectEl.value = String(breakMinutes);
+    startBtn.textContent = workMinutes + '分スタート';
+  }
+  workSelectEl.addEventListener('change', () => {
+    workMinutes = parseInt(workSelectEl.value, 10);
+    localStorage.setItem(LS_WORK_MIN, String(workMinutes));
+    renderSteppers();
+  });
+  breakSelectEl.addEventListener('change', () => {
+    breakMinutes = parseInt(breakSelectEl.value, 10);
+    localStorage.setItem(LS_BREAK_MIN, String(breakMinutes));
+    renderSteppers();
+  });
 
   const focusColors = { 4:'var(--focus-hi)', 3:'var(--focus-mid)', 2:'var(--focus-low)', 1:'var(--focus-none)' };
   const focusLabels = { 4:'しっかり', 3:'まあまあ', 2:'あまり', 1:'全然' };
@@ -465,6 +529,7 @@
   }
 
   function goHome(){
+    renderSteppers();
     renderTodayLog();
     showScreen('home');
   }
@@ -513,7 +578,7 @@
   }
 
   function startTimer(mode){
-    const total = mode === 'work' ? WORK_SECONDS : BREAK_SECONDS;
+    const total = (mode === 'work' ? workMinutes : breakMinutes) * 60;
     timerState = {
       mode, totalSeconds: total, remainingSeconds: total,
       endTs: Date.now() + total*1000, intervalId: null, paused: false,
@@ -565,6 +630,8 @@
       releaseWakeLock();
       playChime();
       if(timerState.mode === 'work'){
+        document.getElementById('rateSub').textContent = 'この' + workMinutes + '分、集中できましたか？';
+        document.getElementById('footerNote').textContent = '記録すると、' + breakMinutes + '分の休憩がはじまります';
         showScreen('rating');
       } else {
         goHome();
@@ -601,7 +668,7 @@
       saveLogs();
       startTimer('break');
       if(sb){
-        sb.from('pomodoro_sessions').insert({ device_id: deviceId, category: 'focus', type: 'input', rating })
+        sb.from('pomodoro_sessions').insert({ category: 'focus', type: 'input', rating, work_minutes: workMinutes, break_minutes: breakMinutes })
           .then(({error}) => { if(error) console.warn('session sync failed:', String(error.message || error)); })
           .catch((err) => { console.warn('session sync unreachable:', String(err && err.message || err)); });
       }
@@ -711,7 +778,7 @@
   async function initApp(){
     if(sb){
       try{
-        const sessRes = await sb.from('pomodoro_sessions').select('rating, created_at').eq('device_id', deviceId).order('created_at', { ascending: true });
+        const sessRes = await sb.from('pomodoro_sessions').select('rating, created_at').order('created_at', { ascending: true });
         if(!sessRes.error && sessRes.data){
           logs = sessRes.data.map(r => ({
             rating: r.rating,
